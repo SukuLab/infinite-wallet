@@ -12,6 +12,7 @@
         </section>
         <section class="tokens" v-if="tokenBalances.length">
           <section :key="token.id" class="token" v-for="token in tokenBalances">
+           
             <section class="actions" v-if="!token.symbol">
               <figure
                 class="action"
@@ -30,7 +31,23 @@
               <figure class="name" v-if="token.name">{{ token.name }}</figure>
               <figure class="balance">
                 {{ token.balance }}
-                <b v-if="token.symbol">{{ token.symbol }}</b>
+                <figure v-if="token.symbol">
+                  <!-- Show NFT -->
+                  <figure v-if="token.display">
+                    <!-- if video -->
+                    <video
+                      v-if="token.display.type.includes('video')"
+                      :src="token.display.url"
+                      type="video/mp4"
+                      controls
+                      autoplay
+                      loop
+                      muted
+                    />
+                    <!-- if image -->
+                    <img v-else :src="token.display.url" />
+                  </figure>
+                </figure>
               </figure>
             </section>
             <section class="actions">
@@ -82,6 +99,7 @@
 </template>
 
 <script>
+import axios from "axios";
 const {
   Client,
   TokenInfoQuery,
@@ -102,7 +120,6 @@ export default {
       STATUS,
       selectedToken: null,
       error: null,
-
       loadingToken: null
     };
   },
@@ -156,6 +173,20 @@ export default {
         });
 
       if (query) {
+        // If token has an ipfs link, load and set display meta in token meta
+        if (query.symbol.includes("/ipfs/")) {
+          const ipfsUrl = query.symbol;
+
+          await axios
+            .get(ipfsUrl)
+            .then(({ data }) => {
+              const nftDisplay = data.sku.nftPublicAssets[0];
+
+              query.display = nftDisplay;
+            })
+            .catch((err) => console.log(err));
+        }
+
         await this.setTokenMeta(tokenId, query);
         this.loadingToken = null;
 
@@ -170,6 +201,12 @@ export default {
 
 <style lang="scss" scoped>
 @import "../styles/variables";
+
+video,
+img {
+  width: 200px;
+  height: 100px;
+}
 
 .associate-token {
   padding: 0 26px 40px;
