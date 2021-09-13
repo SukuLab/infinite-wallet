@@ -16,6 +16,7 @@
     "core-js": "^3.6.5",
     "extension-streams": "^1.0.7",
     "identicon.js": "^2.3.3",
+    "regenerator-runtime": "^0.13.9",
     "scrypt-async": "^2.0.1",
     "v-tooltip": "^2.1.2",
     "vue": "^2.6.11",
