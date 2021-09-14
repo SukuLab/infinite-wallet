@@ -10,6 +10,7 @@ import store from "../store";
 import InternalMessage from "../messages/InternalMessage";
 import * as InternalMessageTypes from "../messages/InternalMessageTypes";
 import { NETWORKS } from "../models/Networks";
+import axios from "axios";
 const { Client, AccountBalanceQuery } = require("@hashgraph/sdk");
 
 Vue.config.productionTip = false;
@@ -39,7 +40,8 @@ export default class VueInitializer {
           "selectedNetwork",
           "balance",
           "activeAccount",
-          "tokenMeta"
+          "tokenMeta",
+          "queriedKabuto"
         ]),
         hbarBalance() {
           if (!this.balance) return null;
@@ -53,14 +55,21 @@ export default class VueInitializer {
         },
         tokenBalances() {
           if (!this.balance) return null;
-          const json = JSON.parse(this.balance.tokens.toString());
-          return Object.keys(json).map((tokenId) => {
-            // Merging in meta data with balances
-            const meta = this.tokenMeta.hasOwnProperty(tokenId)
-              ? this.tokenMeta[tokenId]
-              : { symbol: null, name: null, decimals: null, display: null };
-            return Object.assign({ id: tokenId, balance: json[tokenId] }, meta);
-          });
+
+          if (Array.isArray(this.balance.tokens)) {
+            // Kabuto v2 retrieved tokens info
+            return this.balance.tokens;
+          } else {
+            // Fallback
+            const json = JSON.parse(this.balance.tokens.toString());
+            return Object.keys(json).map((tokenId) => {
+              // Merging in meta data with balances
+              const meta = this.tokenMeta.hasOwnProperty(tokenId)
+                ? this.tokenMeta[tokenId]
+                : { symbol: null, name: null, decimals: null, display: null };
+              return Object.assign({ tokenId, balance: json[tokenId] }, meta);
+            });
+          }
         },
         hasAccount() {
           return !!this.activeAccount;
@@ -155,7 +164,7 @@ export default class VueInitializer {
           if (!this.activeAccount) return;
 
           const client = Client[`for${this.activeAccount.network}`]();
-          const accountBalance = await new AccountBalanceQuery()
+          let accountBalance = await new AccountBalanceQuery()
             .setAccountId(this.activeAccount.name)
             .execute(client)
             .catch((err) => {
@@ -164,6 +173,41 @@ export default class VueInitializer {
             });
 
           if (accountBalance) {
+            // Grab token info from kabuto v2
+            await axios
+              .get(
+                `https://v2.api.testnet.kabuto.sh/account/${this.activeAccount.name}/token`
+              )
+              .then(({ data: tokens }) => {
+                tokens = tokens.data;
+
+                // For every token that has an ipfs link in its symbol,
+                // query the ipfs for the metadata and set the image/video in token.display
+                for (const token of tokens) {
+                  if (token.symbol && token.symbol.includes("ipfs")) {
+                    axios
+                      .get(token.symbol)
+                      .then(
+                        ({ data }) =>
+                          (token.display = data.sku.nftPublicAssets[0])
+                      )
+                      .catch((err) => console.log(err));
+                  }
+                }
+
+                // Set new tokens in accountBalance
+                accountBalance = Object.assign({}, accountBalance, {
+                  tokens
+                });
+
+                // Set state that kabuto v2 was used to retrieve token info
+                store.dispatch("setQueriedKabuto", true);
+              })
+              .catch((err) => {
+                // If kabuto v2 is down, fallback to hedera SDK to retrieve token info
+                store.dispatch("setQueriedKabuto", false);
+              });
+
             store.dispatch("setBalance", accountBalance);
             this.$forceUpdate();
           }
