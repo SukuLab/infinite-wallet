@@ -32,13 +32,18 @@
         class="action"
         v-if="balance"
         @click="$router.push('/tokens')"
-        v-tooltip="'View Tokens'"
+        v-tooltip="queriedKabuto ? 'View Fungible Tokens' : 'View Tokens'"
       >
         <i class="fas fa-coins"></i>
       </figure>
-      <!--<figure class="action" @click="test">-->
-      <!--<i class="fas fa-cog"></i>-->
-      <!--</figure>-->
+      <figure
+        class="action"
+        v-if="balance && queriedKabuto"
+        @click="$router.push('/nft-tokens')"
+        v-tooltip="'View Non-Fungible Tokens'"
+      >
+        <i class="fas fa-file-contract"></i>
+      </figure>
       <figure class="action" @click="lock" v-tooltip="'Lock'">
         <i class="fas fa-lock"></i>
       </figure>
