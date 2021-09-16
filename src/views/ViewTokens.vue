@@ -14,13 +14,10 @@
           <section
             :key="token.tokenId"
             class="token"
-            v-for="token in tokenBalances"
+            v-for="token in queriedKabuto ? FTs : tokenBalances"
           >
             <!-- Fungible Tokens / "Non-NFTs" -->
-            <section
-              v-if="token.type !== 'NON_FUNGIBLE' && queriedKabuto"
-              class="token"
-            >
+            <section v-if="queriedKabuto" class="token">
               <section class="info">
                 <figure class="id">{{ token.tokenId }}</figure>
                 <figure class="name" v-if="token.name">{{ token.name }}</figure>
@@ -160,7 +157,14 @@ export default {
     };
   },
   async mounted() {},
-  computed: {},
+  computed: {
+    // Filter tokenBalances (currently storing all tokens) into an array of ONLY NON-NFT (aka fungible tokens) typed tokens
+    FTs() {
+      return this.tokenBalances.filter(
+        (token) => token.type !== "NON_FUNGIBLE" && token.totalSupply != 1
+      );
+    }
+  },
   methods: {
     async removeToken(token) {
       this.status = STATUS.LOADING;

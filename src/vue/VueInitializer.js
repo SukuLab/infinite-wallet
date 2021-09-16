@@ -181,6 +181,26 @@ export default class VueInitializer {
               .then(({ data: tokens }) => {
                 tokens = tokens.data;
 
+                // Query every token specifically to grab its totalSupply property to
+                // distinguish between pre-HIP-17 & post-HIP-17 created NFTs
+                for (const token of tokens) {
+                  // Tokens of type: null are ignored
+                  if (token.type) {
+                    axios
+                      .get(
+                        `https://v2.api.testnet.kabuto.sh/token/${token.tokenId}`
+                      )
+                      .then(({ data: moreTokenDetails }) => {
+                        // Mash together existing metadata properties in token w/ new metadata properties in moreTokenDetails
+                        Object.assign(token, moreTokenDetails.data);
+                      })
+                      .catch((err) => console.log(err));
+                  }
+                }
+
+                return tokens;
+              })
+              .then((tokens) => {
                 // For every token that has an ipfs link in its symbol,
                 // query the ipfs for the metadata and set the image/video in token.display
                 for (const token of tokens) {
@@ -195,6 +215,9 @@ export default class VueInitializer {
                   }
                 }
 
+                return tokens;
+              })
+              .then((tokens) => {
                 // Set new tokens in accountBalance
                 accountBalance = Object.assign({}, accountBalance, {
                   tokens

@@ -109,9 +109,13 @@ export default {
   async mounted() {},
   computed: {
     // Filter tokenBalances (currently storing all tokens) into an array of ONLY NFT typed tokens
+    // Note: NFTs made before HIP-17 have initialSupply: 1
+    //   NFTs made after HIP-17 have an initialSupply: 0 & type: NON_FUNGIBLE
     NFTs() {
       return this.tokenBalances.filter(
-        (token) => token.type === "NON_FUNGIBLE"
+        (token) =>
+          (token.type === "NON_FUNGIBLE" && token.totalSupply == 0) ||
+          (token.type !== "NON_FUNGIBLE" && token.totalSupply == 1)
       );
     }
   },
