@@ -11,7 +11,7 @@ export default new Vuex.Store({
     balance: null,
     activeAccount: null,
     tokenMeta: {},
-    queriedKabuto: null
+    kabutoOnline: null
   },
   mutations: {
     setPrompt(state, x) {
@@ -32,8 +32,8 @@ export default new Vuex.Store({
     setTokenMeta(state, x) {
       state.tokenMeta = x;
     },
-    setQueriedKabuto(state, x) {
-      state.queriedKabuto = x;
+    setKabutoOnline(state, x) {
+      state.kabutoOnline = x;
     }
   },
   actions: {
@@ -55,8 +55,8 @@ export default new Vuex.Store({
     setTokenMeta({ commit }, x) {
       commit("setTokenMeta", x);
     },
-    setQueriedKabuto({ commit }, x) {
-      commit("setQueriedKabuto", x);
+    setKabutoOnline({ commit }, x) {
+      commit("setKabutoOnline", x);
     }
   },
   modules: {}

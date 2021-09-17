@@ -82,13 +82,7 @@
 </template>
 
 <script>
-import axios from "axios";
-const {
-  Client,
-  TokenInfoQuery,
-  AccountBalanceQuery,
-  TokenDissociateTransaction
-} = require("@hashgraph/sdk");
+const { TokenDissociateTransaction } = require("@hashgraph/sdk");
 
 const STATUS = {
   TOKENS: 0,
@@ -109,7 +103,7 @@ export default {
   async mounted() {},
   computed: {
     // Filter tokenBalances (currently storing all tokens) into an array of ONLY NFT typed tokens
-    // Note: NFTs made before HIP-17 have initialSupply: 1
+    // Note: NFTs made before HIP-17 have initialSupply: 1 & type: FUNGIBLE
     //   NFTs made after HIP-17 have an initialSupply: 0 & type: NON_FUNGIBLE
     NFTs() {
       return this.tokenBalances.filter(

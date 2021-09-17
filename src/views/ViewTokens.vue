@@ -14,10 +14,10 @@
           <section
             :key="token.tokenId"
             class="token"
-            v-for="token in queriedKabuto ? FTs : tokenBalances"
+            v-for="token in kabutoOnline ? FTs : tokenBalances"
           >
             <!-- Fungible Tokens / "Non-NFTs" -->
-            <section v-if="queriedKabuto" class="token">
+            <section v-if="kabutoOnline" class="token">
               <section class="info">
                 <figure class="id">{{ token.tokenId }}</figure>
                 <figure class="name" v-if="token.name">{{ token.name }}</figure>
@@ -44,7 +44,7 @@
             </section>
 
             <!-- Fall back view for if Kabuto v2 is down or has problems retrieving token info -->
-            <section v-if="!queriedKabuto" class="token">
+            <section v-if="!kabutoOnline" class="token">
               <section class="actions" v-if="!token.symbol">
                 <figure
                   class="action"

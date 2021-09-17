@@ -41,7 +41,7 @@ export default class VueInitializer {
           "balance",
           "activeAccount",
           "tokenMeta",
-          "queriedKabuto"
+          "kabutoOnline"
         ]),
         hbarBalance() {
           if (!this.balance) return null;
@@ -123,8 +123,6 @@ export default class VueInitializer {
           }
           if (!account) return;
 
-          console.log("setting active account", account);
-
           store.dispatch("setActiveAccount", account);
         },
         async setSelectedNetwork(network) {
@@ -200,6 +198,10 @@ export default class VueInitializer {
 
                 return tokens;
               })
+              .catch(() => {
+                // If kabuto v2 is down, fallback to hedera SDK to retrieve token info
+                store.dispatch("setKabutoOnline", false);
+              })
               .then((tokens) => {
                 // For every token that has an ipfs link in its symbol,
                 // query the ipfs for the metadata and set the image/video in token.display
@@ -224,11 +226,7 @@ export default class VueInitializer {
                 });
 
                 // Set state that kabuto v2 was used to retrieve token info
-                store.dispatch("setQueriedKabuto", true);
-              })
-              .catch((err) => {
-                // If kabuto v2 is down, fallback to hedera SDK to retrieve token info
-                store.dispatch("setQueriedKabuto", false);
+                store.dispatch("setKabutoOnline", true);
               });
 
             store.dispatch("setBalance", accountBalance);

@@ -12,6 +12,13 @@
     <!--</p>-->
     <!--</section>-->
 
+    <!-- Display offline banner if Kabuto is offline -->
+    <section v-if="hasAccount && !kabutoOnline && finishedLoading">
+      <p class="offline-banner">
+        The mirror node is currently <strong>unavailable</strong>.
+      </p>
+    </section>
+
     <section class="actions" v-if="hasAccount">
       <figure
         class="action"
@@ -32,14 +39,14 @@
         class="action"
         v-if="balance"
         @click="$router.push('/tokens')"
-        v-tooltip="queriedKabuto ? 'View Fungible Tokens' : 'View Tokens'"
+        v-tooltip="kabutoOnline ? 'View Fungible Tokens' : 'View Tokens'"
       >
         <i class="fas fa-coins"></i>
       </figure>
       <figure
-        class="action"
-        v-if="balance && queriedKabuto"
-        @click="$router.push('/nft-tokens')"
+        :class="{ action: kabutoOnline, disabled: !kabutoOnline }"
+        v-if="balance"
+        @click="kabutoOnline ? $router.push('/nft-tokens') : null"
         v-tooltip="'View Non-Fungible Tokens'"
       >
         <i class="fas fa-file-contract"></i>
@@ -79,9 +86,12 @@ export default {
     this.checkActiveAccount();
     this.getTokenMeta();
     this.getAccountInfo();
+
+    // Quick workaround for offline banner flashing when everything hasn't loaded
+    setTimeout(() => (this.finishedLoading = true), 1500);
   },
   data() {
-    return {};
+    return { finishedLoading: false };
   },
   computed: {},
   methods: {
@@ -102,7 +112,7 @@ export default {
 .main-screen {
   padding: 0 26px 40px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   flex-direction: column;
   width: 100%;
@@ -113,18 +123,19 @@ export default {
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    padding: 20px 30px;
+    padding: 20px 5px 0 5px;
+    margin-bottom: 3rem;
 
     .action {
       margin: 10px;
       border-radius: 4px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 3px 8px rgba(0, 0, 0, 0.03);
+
       color: $black;
       background: $white;
       padding: 22px;
       cursor: pointer;
       transition: all 0.2s ease;
-      transition-property: box-shadow, color, transform;
+      transition-property: color, transform;
 
       i {
         font-size: 18px;
@@ -137,18 +148,34 @@ export default {
       }
 
       &:hover {
-        box-shadow: 0 6px 13px rgba(0, 0, 0, 0.1),
-          0 12px 34px rgba(0, 0, 0, 0.05);
         transform: translateY(-2px);
         color: rgba(0, 0, 0, 0.7);
       }
 
       &:active {
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 3px 5px rgba(0, 0, 0, 0.07);
         transform: translateY(2px);
         color: rgba(0, 0, 0, 0.1);
       }
     }
+  }
+
+  .disabled {
+    margin: 10px;
+    border-radius: 4px;
+    color: $black;
+    background: $lightergrey;
+    padding: 22px;
+
+    i {
+      font-size: 18px;
+    }
+  }
+
+  .offline-banner {
+    color: $darkred;
+    background: $lightred;
+    border-radius: 4px;
+    padding: 0.5rem;
   }
 }
 </style>
