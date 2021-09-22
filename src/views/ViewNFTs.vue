@@ -4,100 +4,50 @@
 
     <transition name="pop-between" mode="out-in">
       <section key="1" class="container" v-if="status === STATUS.TOKENS">
-        <section class="no-tokens" v-if="!tokenBalances.length">
+        <section class="no-tokens" v-if="!NFTs.length">
           <span>You don't have any tokens yet!</span>
           Before you can get any tokens, you'll need to approve / associate that
           token with your account. Go back to the main menu and click the
           "Approve token" button to get started.
         </section>
-        <section class="tokens" v-if="tokenBalances.length">
-          <section
-            :key="token.tokenId"
-            class="token"
-            v-for="token in kabutoOnline ? FTs : tokenBalances"
-          >
-            <!-- Fungible Tokens / "Non-NFTs" -->
-            <section v-if="kabutoOnline" class="token">
-              <section class="info">
-                <figure class="id">{{ token.tokenId }}</figure>
-                <figure class="name" v-if="token.name">{{ token.name }}</figure>
-                <figure class="balance" v-if="token.balance">
-                  {{ token.balance }}
-                </figure>
-              </section>
-              <section class="actions">
-                <figure
-                  class="action"
-                  @click="removeToken(token)"
-                  v-tooltip.left="'Remove'"
-                >
-                  <i class="fas fa-ban"></i>
-                </figure>
-                <figure
-                  class="action"
-                  @click="transferToken(token)"
-                  v-tooltip.left="'Transfer'"
-                >
-                  <i class="fas fa-exchange-alt"></i>
-                </figure>
-              </section>
+        <section class="tokens" v-if="NFTs.length">
+          <section :key="NFT.tokenId" class="token" v-for="NFT of NFTs">
+            <!-- Non-Fungible Tokens -->
+            <section class="info">
+              <!-- Show NFT details (token Id & name) -->
+              <figure class="id">{{ NFT.tokenId }}</figure>
+              <figure class="name" v-if="NFT.name">{{ NFT.name }}</figure>
+              <!-- Show NFT -->
+              <figure v-if="NFT.display">
+                <!-- if video -->
+                <video
+                  v-if="NFT.display.type.includes('video')"
+                  :src="NFT.display.url"
+                  type="video/mp4"
+                  controls
+                  autoplay
+                  loop
+                  muted
+                />
+                <!-- if image -->
+                <img v-else :src="NFT.display.url" />
+              </figure>
             </section>
-
-            <!-- Fall back view for if Kabuto v2 is down or has problems retrieving token info -->
-            <section v-if="!kabutoOnline" class="token">
-              <section class="actions" v-if="!token.symbol">
-                <figure
-                  class="action"
-                  @click="loadTokenInfo(token.tokenId)"
-                  v-tooltip.right="'Load token info <br />(costs $0.0001)'"
-                >
-                  <i
-                    v-if="loadingToken !== token.tokenId"
-                    class="fas fa-info-circle"
-                  ></i>
-                  <i v-else class="fas fa-spinner fa-spin"></i>
-                </figure>
-              </section>
-              <section class="info" :class="{ 'no-pad': token.symbol }">
-                <figure class="id">{{ token.tokenId }}</figure>
-                <figure class="name" v-if="token.name">
-                  {{ token.name }}
-                </figure>
-                <figure class="balance" v-if="token.balance && !token.display">
-                  {{ token.balance }}
-                </figure>
-                <!-- Show NFT -->
-                <figure v-if="token.display">
-                  <!-- if video -->
-                  <video
-                    v-if="token.display.type.includes('video')"
-                    :src="token.display.url"
-                    type="video/mp4"
-                    controls
-                    autoplay
-                    loop
-                    muted
-                  />
-                  <!-- if image -->
-                  <img v-else :src="token.display.url" />
-                </figure>
-              </section>
-              <section class="actions">
-                <figure
-                  class="action"
-                  @click="removeToken(token)"
-                  v-tooltip.left="'Remove'"
-                >
-                  <i class="fas fa-ban"></i>
-                </figure>
-                <figure
-                  class="action"
-                  @click="transferToken(token)"
-                  v-tooltip.left="'Transfer'"
-                >
-                  <i class="fas fa-exchange-alt"></i>
-                </figure>
-              </section>
+            <section class="actions">
+              <figure
+                class="action"
+                @click="removeToken(NFT)"
+                v-tooltip.left="'Remove'"
+              >
+                <i class="fas fa-ban"></i>
+              </figure>
+              <figure
+                class="action"
+                @click="transferToken(NFT)"
+                v-tooltip.left="'Transfer'"
+              >
+                <i class="fas fa-exchange-alt"></i>
+              </figure>
             </section>
           </section>
         </section>
@@ -132,13 +82,7 @@
 </template>
 
 <script>
-import axios from "axios";
-const {
-  Client,
-  TokenInfoQuery,
-  AccountBalanceQuery,
-  TokenDissociateTransaction
-} = require("@hashgraph/sdk");
+const { TokenDissociateTransaction } = require("@hashgraph/sdk");
 
 const STATUS = {
   TOKENS: 0,
@@ -158,10 +102,14 @@ export default {
   },
   async mounted() {},
   computed: {
-    // Filter tokenBalances (currently storing all tokens) into an array of ONLY NON-NFT (aka fungible tokens) typed tokens
-    FTs() {
+    // Filter tokenBalances (currently storing all tokens) into an array of ONLY NFT typed tokens
+    // Note: NFTs made before HIP-17 have initialSupply: 1 & type: FUNGIBLE
+    //   NFTs made after HIP-17 have an initialSupply: 0 & type: NON_FUNGIBLE
+    NFTs() {
       return this.tokenBalances.filter(
-        (token) => token.type !== "NON_FUNGIBLE" && token.totalSupply != 1
+        (token) =>
+          (token.type === "NON_FUNGIBLE" && token.totalSupply == 0) ||
+          (token.type !== "NON_FUNGIBLE" && token.totalSupply == 1)
       );
     }
   },
@@ -200,39 +148,6 @@ export default {
         path: "/transfer",
         query: { tokenId: token.tokenId }
       });
-    },
-    async loadTokenInfo(tokenId) {
-      this.loadingToken = tokenId;
-      const client = this.getClient();
-      let query = await new TokenInfoQuery()
-        .setTokenId(tokenId)
-        .execute(client)
-        .catch((err) => {
-          console.error("Token get info error", err);
-          this.status = STATUS.ERROR;
-          this.error = err;
-          this.loadingToken = null;
-          return null;
-        });
-
-      if (query) {
-        // Fallback method for if Kabuto v2 is down to get metadata from ipfs links / clicking load token info button manually
-
-        // If token has an ipfs link in its symbol, load and set display meta in token meta
-        if (query.symbol.includes("/ipfs/")) {
-          await axios
-            .get(query.symbol)
-            .then(({ data }) => (query.display = data.sku.nftPublicAssets[0]))
-            .catch((err) => console.log(err));
-        }
-
-        await this.setTokenMeta(tokenId, query);
-        this.loadingToken = null;
-
-        setTimeout(() => {
-          this.getAccountInfo();
-        }, 1000);
-      }
     }
   }
 };
