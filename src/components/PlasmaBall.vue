@@ -1,35 +1,80 @@
 <template>
-  <section class="waiting">
-    <section class="graphic">
-      <svg width="0" height="0">
-        <filter id="gooey-plasma-2">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="20" result="blur" />
-          <feColorMatrix
-            in="blur"
-            mode="matrix"
-            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 50 -16"
-            result="goo"
-          />
-        </filter>
-      </svg>
-      <div class="plasma-2">
-        <ul class="gooey-container">
-          <li class="bubble"></li>
-          <li class="bubble"></li>
-          <li class="bubble"></li>
-          <li class="bubble"></li>
-          <li class="bubble"></li>
-          <li class="bubble"></li>
-        </ul>
-      </div>
+  <div class="wrapper">
+    <section class="waiting">
+      <section class="graphic">
+        <svg width="0" height="0">
+          <filter id="gooey-plasma-2">
+            <feGaussianBlur
+              in="SourceGraphic"
+              stdDeviation="20"
+              result="blur"
+            />
+            <feColorMatrix
+              in="blur"
+              mode="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 50 -16"
+              result="goo"
+            />
+          </filter>
+        </svg>
+        <div class="plasma-2">
+          <ul class="gooey-container">
+            <li class="bubble"></li>
+            <li class="bubble"></li>
+            <li class="bubble"></li>
+            <li class="bubble"></li>
+            <li class="bubble"></li>
+            <li class="bubble"></li>
+          </ul>
+        </div>
+      </section>
     </section>
-    <figure class="text">{{ text }}</figure>
-  </section>
+    <section class="api-status">
+      <p v-if="apiLoadingStatus.status" class="api-message">
+        {{ apiLoadingStatus.status }}
+      </p>
+      <p v-else-if="apiLoadingStatus.error" class="api-error">
+        {{ apiLoadingStatus.error }}
+      </p>
+      <figure v-else class="text">{{ text }}</figure>
+    </section>
+    <div v-if="description" class="warning">
+      <p class="message">
+        Hedera network status is:
+        <span class="status">{{ description }}.</span>
+      </p>
+      <p class="message">You may experience slow transactions or errors.</p>
+      <hr v-if="degradedComponents.length" />
+      <ul class="components" v-if="degradedComponents.length">
+        <li
+          class="component"
+          :key="component.name"
+          v-for="component of degradedComponents"
+        >
+          <p class="component-info">
+            {{ component.name }}:
+            <span class="status">{{ component.status }}</span>
+          </p>
+        </li>
+      </ul>
+    </div>
+  </div>
 </template>
 
 <script>
+import { mapState } from "vuex";
+
 export default {
-  props: ["text"]
+  props: ["text"],
+  computed: {
+    ...mapState(["apiLoadingStatus", "hederaNetworkStatus"]),
+    description() {
+      return this.hederaNetworkStatus?.description;
+    },
+    degradedComponents() {
+      return this.hederaNetworkStatus?.degradedComponents;
+    },
+  },
 };
 </script>
 
@@ -37,22 +82,21 @@ export default {
 @import "../styles/variables";
 $plasmawidth: 180px;
 
+.wrapper {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
 .waiting {
   width: $plasmawidth;
   height: $plasmawidth;
   display: block;
   position: relative;
-
-  .text {
-    margin-top: 10px;
-    font-size: 11px;
-    color: $white;
-    font-weight: 500;
-  }
+  margin: auto;
 
   .graphic {
     border-radius: 50%;
-    box-shadow: inset 0 0 50px 10px $lightblue, inset 0 0 10px 0 $darkblue;
+    box-shadow: inset 0 0 50px 10px $darkerblue, inset 0 0 10px 0 $darkblue;
     width: $plasmawidth;
     height: $plasmawidth;
     font-size: 12px;
@@ -77,8 +121,8 @@ $plasmawidth: 180px;
       }
     }
 
-    $color1: $white;
-    $color2: yellow;
+    $color1: $darkerblue;
+    $color2: $yellow;
     $color3: $yellow;
     $modifier: 6;
 
@@ -138,6 +182,70 @@ $plasmawidth: 180px;
         }
       }
     }
+  }
+}
+
+.api-status {
+  margin-top: 0.8rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+
+  .api-error {
+    color: $red;
+  }
+
+  .api-message {
+    color: $yellow;
+  }
+
+  .text {
+    color: $white;
+  }
+}
+
+.warning {
+  text-align: left;
+  margin-top: auto;
+
+  p {
+    margin: 0;
+  }
+
+  ul {
+    margin: 0;
+    margin-top: 0.5rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    font-size: 0.7rem;
+  }
+
+  li + li {
+    margin-top: 0.5rem;
+  }
+
+  hr {
+    border: 0;
+    border-top: solid thin $grey-950;
+  }
+
+    .message {
+      color: $red;
+    }
+
+  .status {
+    color: $red;
+    font-weight: 600;
+  }
+
+  .message,
+  .services {
+    margin-top: 0.5rem;
+  }
+
+  .message + .message {
+    margin-top: 4px;
   }
 }
 </style>

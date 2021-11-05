@@ -31,7 +31,7 @@ export default class ObjectHelpers {
      * @returns {*}
      */
     static distinctObjectArray(array){
-        return array.reduce((a,b) => (!!a.find(x => this.deepEqual(x, b))) ? a : a.concat(b), []);
+        return array.reduce((a,b) => (a.find(x => this.deepEqual(x, b))) ? a : a.concat(b), []);
     }
 
     /***

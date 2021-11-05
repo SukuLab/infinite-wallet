@@ -94,6 +94,36 @@ export default class StorageService {
 		})
 	}
 
+	static setTokenBalance(balanceQueryTokens){
+		return new Promise(async resolve => {
+			try {
+				apis.storage.local.set({tokenBalance: balanceQueryTokens}, () => {
+					resolve(true);
+				});
+			} catch(e){
+				console.error("Error saving token balance", e);
+				resolve(false);
+			}
+		})
+	}
+
+	static getTokenBalance() {
+		return new Promise(resolve => {
+			apis.storage.local.get('tokenBalance', (possible) => {
+				try {
+					if(possible && possible.hasOwnProperty('tokenBalance')){
+						return resolve(possible.tokenBalance);
+					}
+
+					resolve({});
+				} catch(e){
+					console.error("Error getting token balance", e);
+					resolve(null);
+				}
+			});
+		})
+	}
+
 	static setActiveAccount(activeAccount){
 		return new Promise(async resolve => {
 			try {

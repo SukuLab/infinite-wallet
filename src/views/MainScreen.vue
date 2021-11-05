@@ -12,13 +12,6 @@
     <!--</p>-->
     <!--</section>-->
 
-    <!-- Display offline banner if Kabuto is offline -->
-    <section v-if="hasAccount && !kabutoOnline && finishedLoading">
-      <p class="offline-banner">
-        The mirror node is currently <strong>unavailable</strong>.
-      </p>
-    </section>
-
     <section class="actions" v-if="hasAccount">
       <figure
         class="action"
@@ -39,14 +32,14 @@
         class="action"
         v-if="balance"
         @click="$router.push('/tokens')"
-        v-tooltip="kabutoOnline ? 'View Fungible Tokens' : 'View Tokens'"
+        v-tooltip="'View Fungible Tokens'"
       >
         <i class="fas fa-coins"></i>
       </figure>
       <figure
-        :class="{ action: kabutoOnline, disabled: !kabutoOnline }"
+        class="action"
         v-if="balance"
-        @click="kabutoOnline ? $router.push('/nft-tokens') : null"
+        @click="$router.push('/nft-tokens')"
         v-tooltip="'View Non-Fungible Tokens'"
       >
         <i class="fas fa-file-contract"></i>
@@ -70,6 +63,7 @@
     </section>
 
     <PlasmaBall text="Listening for incoming gossip" />
+
   </div>
 </template>
 
@@ -123,8 +117,8 @@ export default {
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
-    padding: 20px 5px 0 5px;
-    margin-bottom: 3rem;
+    padding: 8px 5px 0 5px;
+    margin-bottom: 0.5rem;
 
     .action {
       margin: 10px;
@@ -132,7 +126,7 @@ export default {
 
       color: $black;
       background: $white;
-      padding: 22px;
+      padding: 20px;
       cursor: pointer;
       transition: all 0.2s ease;
       transition-property: color, transform;

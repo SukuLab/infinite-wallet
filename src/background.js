@@ -37,7 +37,6 @@ export default class Background {
 	setupInternalMessaging(){
 		LocalStream.watch((request, sendResponse) => {
 			const message = InternalMessage.fromJson(request);
-			console.log('got message', message, sendResponse);
 
 			// Only messages allowed are those defined in InternalMessageTypes
 			if(!Object.values(InternalMessageTypes).includes(message.type)) return sendResponse(null);
@@ -172,6 +171,14 @@ export default class Background {
 
 	async [InternalMessageTypes.GET_TOKEN_META](sendResponse){
 		sendResponse(await StorageService.getTokenMeta());
+	}
+
+	async [InternalMessageTypes.SET_TOKEN_BALANCE](sendResponse, balanceQueryTokens){
+		sendResponse(await StorageService.setTokenBalance(balanceQueryTokens));
+	}
+
+	async [InternalMessageTypes.GET_TOKEN_BALANCE](sendResponse){
+		sendResponse(await StorageService.getTokenBalance());
 	}
 
 	async [InternalMessageTypes.SET_ACTIVE_ACCOUNT](sendResponse, account){
@@ -310,7 +317,6 @@ export default class Background {
 
 				const network = loginPermission.network;
 				const details = TransactionBody.decode(buffer);
-				console.log('Details', details)
 
 				// if(details.data === 'cryptoTransfer' && details.cryptoTransfer.transfers.accountAmounts.every(x => x.amount.high === 0 && x.amount.low === 0)){
 				// 	// This is a free query, can just sign it off.

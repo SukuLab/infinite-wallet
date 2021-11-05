@@ -14,6 +14,8 @@ import PlasmaBall from '../components/PlasmaBall.vue'
 import AnimatedNumber from '../components/AnimatedNumber.vue'
 import ImportAccount from '../components/ImportAccount.vue'
 import ViewPrivateKey from '../components/ViewPrivateKey.vue'
+import TokenTile from '../components/TokenTile.vue'
+import TokenAsset from '../components/TokenAsset.vue'
 
 class Popup {
 
@@ -28,6 +30,8 @@ class Popup {
 			{tag:'AnimatedNumber', vue:AnimatedNumber},
 			{tag:'ImportAccount', vue:ImportAccount},
 			{tag:'ViewPrivateKey', vue:ViewPrivateKey},
+			{tag:'TokenTile', vue:TokenTile},
+			{tag:'TokenAsset', vue:TokenAsset},
 		];
 
 		(async() => {

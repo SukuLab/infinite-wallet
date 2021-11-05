@@ -199,7 +199,7 @@ export default {
     bottom: 0;
     left: 0;
     right: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: $base;
     z-index: -1;
     opacity: 0;
 
@@ -210,7 +210,7 @@ export default {
     position: relative;
     z-index: 1;
 
-    background: white;
+    background: $grey-100;
     padding: 40px 26px 40px;
     display: flex;
     justify-content: space-between;
@@ -231,15 +231,15 @@ export default {
   }
 
   .details {
-    color: $black;
+    color: $grey-800;
     font-size: 18px;
     font-weight: 300;
     width: 100%;
 
     input {
       padding: 0 10px;
-      color: $black;
-      border: 1px solid $black;
+      color: $grey-800;
+      border: 1px solid $grey-800;
     }
   }
 
