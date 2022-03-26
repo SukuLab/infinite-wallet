@@ -1,104 +1,95 @@
 <template>
   <section class="associate-token">
-    <Navbar :show-go-back="true" />
+    <Navbar :show-go-back="true" class="navbar" />
 
     <transition name="pop-between" mode="out-in">
       <section key="1" class="container" v-if="status === STATUS.TOKENS">
-        <section class="no-tokens" v-if="!tokenBalances.length">
+        <section
+          class="no-tokens"
+          v-if="
+            (!tokens || !tokens.length) && (!unknownType || !unknownType.length)
+          "
+        >
           <span>You don't have any tokens yet!</span>
           Before you can get any tokens, you'll need to approve / associate that
           token with your account. Go back to the main menu and click the
           "Approve token" button to get started.
         </section>
-        <section class="tokens" v-if="tokenBalances.length">
+        <section
+          class="tokens unknown"
+          v-if="unknownType && unknownType.length"
+        >
+          <header>
+            <h3>Tokens of unknown Type</h3>
+            <p>
+              These tokens have been found in your wallet but don't have their
+              metadata loaded. You can click on the information button for each
+              token to query data using hbars or try to get metadata from mirror
+              nodes:
+            </p>
+            <button class="retry-button" @click="retryMirrorNodes">
+              Retry loading metadata
+            </button>
+          </header>
+          <section :key="token.id" class="token" v-for="token in unknownType">
+            <TokenTile
+              :token="token"
+              :loadingData="loadingToken === token.id"
+              @ipfsLoading="addIpfsLoading"
+              @ipfsLoaded="storeIpfsMeta"
+              @loadTokenInfo="loadTokenInfo(token.id)"
+              @removeToken="removeToken(token)"
+              @transferToken="transferToken(token)"
+            />
+          </section>
+          <hr />
+        </section>
+        <section
+          class="tokens unknown"
+          v-if="missingSerialData && missingSerialData.length"
+        >
+          <header>
+            <h3>Tokens with missing serial data</h3>
+            <p>
+              These tokens have been found in your wallet but don't have their
+              serial data loaded. You can retry to get their data from mirror
+              nodes:
+            </p>
+            <button class="retry-button" @click="retryMirrorNodes">
+              Retry loading token serial data
+            </button>
+          </header>
           <section
-            :key="token.tokenId"
+            :key="token.id"
             class="token"
-            v-for="token in kabutoOnline ? FTs : tokenBalances"
+            v-for="token in missingSerialData"
           >
-            <!-- Fungible Tokens / "Non-NFTs" -->
-            <section v-if="kabutoOnline" class="token">
-              <section class="info">
-                <figure class="id">{{ token.tokenId }}</figure>
-                <figure class="name" v-if="token.name">{{ token.name }}</figure>
-                <figure class="balance" v-if="token.balance">
-                  {{ token.balance }}
-                </figure>
-              </section>
-              <section class="actions">
-                <figure
-                  class="action"
-                  @click="removeToken(token)"
-                  v-tooltip.left="'Remove'"
-                >
-                  <i class="fas fa-ban"></i>
-                </figure>
-                <figure
-                  class="action"
-                  @click="transferToken(token)"
-                  v-tooltip.left="'Transfer'"
-                >
-                  <i class="fas fa-exchange-alt"></i>
-                </figure>
-              </section>
-            </section>
-
-            <!-- Fall back view for if Kabuto v2 is down or has problems retrieving token info -->
-            <section v-if="!kabutoOnline" class="token">
-              <section class="actions" v-if="!token.symbol">
-                <figure
-                  class="action"
-                  @click="loadTokenInfo(token.tokenId)"
-                  v-tooltip.right="'Load token info <br />(costs $0.0001)'"
-                >
-                  <i
-                    v-if="loadingToken !== token.tokenId"
-                    class="fas fa-info-circle"
-                  ></i>
-                  <i v-else class="fas fa-spinner fa-spin"></i>
-                </figure>
-              </section>
-              <section class="info" :class="{ 'no-pad': token.symbol }">
-                <figure class="id">{{ token.tokenId }}</figure>
-                <figure class="name" v-if="token.name">
-                  {{ token.name }}
-                </figure>
-                <figure class="balance" v-if="token.balance && !token.display">
-                  {{ token.balance }}
-                </figure>
-                <!-- Show NFT -->
-                <figure v-if="token.display">
-                  <!-- if video -->
-                  <video
-                    v-if="token.display.type.includes('video')"
-                    :src="token.display.url"
-                    type="video/mp4"
-                    controls
-                    autoplay
-                    loop
-                    muted
-                  />
-                  <!-- if image -->
-                  <img v-else :src="token.display.url" />
-                </figure>
-              </section>
-              <section class="actions">
-                <figure
-                  class="action"
-                  @click="removeToken(token)"
-                  v-tooltip.left="'Remove'"
-                >
-                  <i class="fas fa-ban"></i>
-                </figure>
-                <figure
-                  class="action"
-                  @click="transferToken(token)"
-                  v-tooltip.left="'Transfer'"
-                >
-                  <i class="fas fa-exchange-alt"></i>
-                </figure>
-              </section>
-            </section>
+            <TokenTile
+              :token="token"
+              :loadingData="loadingToken === token.id"
+              @ipfsLoading="addIpfsLoading"
+              @ipfsLoaded="storeIpfsMeta"
+              @loadTokenInfo="loadTokenInfo(token.id)"
+              @removeToken="removeToken(token)"
+              @transferToken="transferToken(token)"
+            />
+          </section>
+          <hr />
+        </section>
+        <section class="tokens" v-if="tokens && tokens.length">
+          <header v-if="unknownType && unknownType.length">
+            <h3>Tokens:</h3>
+          </header>
+          <section :key="token.id" class="token" v-for="token in tokens">
+            <TokenTile
+              :token="token"
+              :loadingData="loadingToken === token.id"
+              @ipfsLoading="addIpfsLoading"
+              @ipfsLoaded="storeIpfsMeta"
+              @loadTokenInfo="loadTokenInfo(token.id)"
+              @removeToken="removeToken(token)"
+              @transferToken="transferToken(token)"
+            />
           </section>
         </section>
       </section>
@@ -132,18 +123,17 @@
 </template>
 
 <script>
-import axios from "axios";
 const {
-  Client,
   TokenInfoQuery,
-  AccountBalanceQuery,
-  TokenDissociateTransaction
+  TokenDissociateTransaction,
 } = require("@hashgraph/sdk");
+
+import store from "../store";
 
 const STATUS = {
   TOKENS: 0,
   LOADING: 1,
-  ERROR: 2
+  ERROR: 2,
 };
 
 export default {
@@ -153,17 +143,61 @@ export default {
       STATUS,
       selectedToken: null,
       error: null,
-      loadingToken: null
+      loadingToken: null,
+      loadingIpfs: [],
+      loadedTokens: [],
     };
   },
   async mounted() {},
   computed: {
+    // Filter tokens without metadata
+    unknownType() {
+      return this.tokenBalances?.filter((token) => {
+        return (
+          token?.type === undefined &&
+          token?.totalSupply === undefined &&
+          !token?.metaDataLoaded
+        );
+      });
+    },
+    // Filter tokens without serial data
+    missingSerialData() {
+      return this.tokenBalances?.filter((token) => {
+        return (
+          token?.type !== undefined &&
+          token?.type.includes("NON_FUNGIBLE") &&
+          !token?.serialDataLoaded
+        );
+      });
+    },
     // Filter tokenBalances (currently storing all tokens) into an array of ONLY NON-NFT (aka fungible tokens) typed tokens
     FTs() {
-      return this.tokenBalances.filter(
-        (token) => token.type !== "NON_FUNGIBLE" && token.totalSupply != 1
+      return this.tokenBalances?.filter((token) => {
+        return (
+          token?.type !== undefined &&
+          !token.type.includes("NON_FUNGIBLE") &&
+          token.totalSupply != 1
+        );
+      });
+    },
+    // Filter tokenBalances (currently storing all tokens) into an array of ONLY NFT typed tokens
+    // Note: NFTs made before HIP-17 have initialSupply: 1 & type: FUNGIBLE
+    //   NFTs made after HIP-17 have an initialSupply: 0 & type: NON_FUNGIBLE
+    NFTs() {
+      return this.tokenBalances?.filter(
+        (token) =>
+          (token?.type !== undefined &&
+            token.type.includes("NON_FUNGIBLE") &&
+            token.serialDataLoaded) ||
+          (token?.type !== undefined &&
+            !token.type.includes("NON_FUNGIBLE") &&
+            token.totalSupply == 1)
       );
-    }
+    },
+    tokens() {
+      const route = this.$router.history.current.name;
+      return route === "nft-tokens" ? this.NFTs : this.FTs;
+    },
   },
   methods: {
     async removeToken(token) {
@@ -171,7 +205,7 @@ export default {
       const client = this.getClient();
       const tx = await new TokenDissociateTransaction()
         .setAccountId(this.activeAccount.name)
-        .setTokenIds([token.tokenId])
+        .setTokenIds([token.id])
         .execute(client)
         .catch((err) => {
           console.error("Token dissociate error", err);
@@ -198,7 +232,7 @@ export default {
     transferToken(token) {
       this.$router.push({
         path: "/transfer",
-        query: { tokenId: token.tokenId }
+        query: { tokenId: token.id },
       });
     },
     async loadTokenInfo(tokenId) {
@@ -216,45 +250,80 @@ export default {
         });
 
       if (query) {
-        // Fallback method for if Kabuto v2 is down to get metadata from ipfs links / clicking load token info button manually
+        const { totalSupply, tokenType, tokenMemo, symbol, name } = query;
 
-        // If token has an ipfs link in its symbol, load and set display meta in token meta
-        if (query.symbol.includes("/ipfs/")) {
-          await axios
-            .get(query.symbol)
-            .then(({ data }) => (query.display = data.sku.nftPublicAssets[0]))
-            .catch((err) => console.log(err));
-        }
-
-        await this.setTokenMeta(tokenId, query);
-        this.loadingToken = null;
+        await this.setTokenMeta(tokenId, {
+          ...this.tokenMeta[tokenId],
+          totalSupply:
+            totalSupply?.toString() ?? this.tokenMeta[tokenId]?.totalSupply,
+          name: name ? name : this.tokenMeta[tokenId]?.name,
+          type: tokenType
+            ? tokenType?.toString()
+            : this.tokenMeta[tokenId]?.type,
+          symbol: symbol ? symbol : this.tokenMeta[tokenId]?.symbol,
+          memo: tokenMemo ? tokenMemo : this.tokenMeta[tokenId]?.memo,
+          metaDataLoaded: true,
+        });
 
         setTimeout(() => {
           this.getAccountInfo();
+          this.loadingToken = null;
         }, 1000);
+
+        this.$forceUpdate();
       }
-    }
-  }
+    },
+    addIpfsLoading(tokenId) {
+      this.loadingIpfs.push(tokenId);
+    },
+    async storeIpfsMeta({ tokenId, ipfsData }) {
+      // if loaded are less than total append to loaded list
+      if (this.loadedTokens?.length < this.loadingIpfs?.length) {
+        this.loadedTokens.push({ tokenId, ipfsData });
+      }
+
+      // if loaded is equal to total store using setTokenMeta
+      if (this.loadedTokens?.length === this.loadingIpfs?.length) {
+        for (const loadedToken of this.loadedTokens) {
+          const ipfsDataName =
+            loadedToken.ipfsData?.metadata?.name ??
+            loadedToken.ipfsData?.sku?.name;
+
+          await this.setTokenMeta(loadedToken.tokenId, {
+            ...this.tokenMeta[loadedToken.tokenId],
+            ipfs: { ...loadedToken.ipfsData },
+            name: ipfsDataName ?? this.tokenMeta[loadedToken.tokenId].name,
+          });
+        }
+      }
+    },
+    async retryMirrorNodes() {
+      await store.dispatch("setApiLoadingStatus", {
+        status: "Reloading token metadata from mirror nodes.",
+        error: null,
+      });
+      this.$router.push("/main");
+    },
+  },
 };
 </script>
 
 <style lang="scss" scoped>
 @import "../styles/variables";
 
-video,
-img {
-  width: 200px;
-  height: 100px;
-}
-
 .associate-token {
-  padding: 0 26px 40px;
+  padding: 0;
+  padding-left: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-direction: column;
   width: 100%;
   height: 100%;
+
+  .navbar {
+    padding-right: 24px;
+  }
 
   .no-tokens {
     display: flex;
@@ -329,6 +398,7 @@ img {
     flex-direction: column;
     width: 100%;
     height: 100%;
+    overflow-y: auto;
 
     &.centered {
       justify-content: center;
@@ -337,8 +407,18 @@ img {
 
   .tokens {
     width: 100%;
-    max-height: calc(100vh - 120px);
-    overflow-y: auto;
+
+    header {
+      h3 {
+        color: $grey-800;
+        font-size: 1.25rem;
+        margin-top: 0;
+      }
+    }
+
+    .token + .token {
+      margin-top: 20px;
+    }
 
     .token {
       width: 100%;
@@ -346,6 +426,8 @@ img {
       align-items: flex-start;
       border-bottom: 1px solid rgba(0, 0, 0, 0.04);
       padding: 10px 5px 10px 0;
+      padding: 0;
+      padding-right: 18px;
 
       .info {
         flex: 1;
@@ -371,46 +453,33 @@ img {
           font-weight: bold;
         }
       }
+    }
+  }
 
-      .actions {
-        flex: 0 0 auto;
-        display: flex;
+  .tokens + .tokens {
+    margin-top: 8px;
+  }
 
-        .action {
-          margin: 0 2px;
-          border-radius: 4px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1),
-            0 3px 8px rgba(0, 0, 0, 0.03);
-          color: $darkgrey;
-          background: $white;
-          height: 30px;
-          width: 30px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          transition-property: box-shadow, color, transform;
+  .tokens.unknown {
+    header {
+      padding: 26px;
 
-          i {
-            font-size: 14px;
-          }
-
-          &:hover {
-            box-shadow: 0 6px 13px rgba(0, 0, 0, 0.1),
-              0 12px 34px rgba(0, 0, 0, 0.05);
-            transform: translateY(-2px);
-            color: rgba(0, 0, 0, 0.7);
-          }
-
-          &:active {
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12),
-              0 3px 5px rgba(0, 0, 0, 0.07);
-            transform: translateY(2px);
-            color: rgba(0, 0, 0, 0.1);
-          }
-        }
+      p {
+        color: $grey-700;
       }
+
+      .retry-button {
+        font-size: 1rem;
+        margin-top: 8px;
+        margin-bottom: 8px;
+        height: 3rem;
+      }
+    }
+
+    hr {
+      border: 0;
+      border-top: solid thin $grey-100;
+      margin: 16px 18px 16px 0;
     }
   }
 }

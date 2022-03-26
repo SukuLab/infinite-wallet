@@ -11,7 +11,8 @@ export default new Vuex.Store({
     balance: null,
     activeAccount: null,
     tokenMeta: {},
-    kabutoOnline: null
+    apiLoadingStatus: {},
+    hederaNetworkStatus: null,
   },
   mutations: {
     setPrompt(state, x) {
@@ -32,8 +33,11 @@ export default new Vuex.Store({
     setTokenMeta(state, x) {
       state.tokenMeta = x;
     },
-    setKabutoOnline(state, x) {
-      state.kabutoOnline = x;
+    setApiLoadingStatus(state, x) {
+      state.apiLoadingStatus = x;
+    },
+    setHederaNetworkStatus(state, x) {
+      state.hederaNetworkStatus = x;
     }
   },
   actions: {
@@ -55,8 +59,11 @@ export default new Vuex.Store({
     setTokenMeta({ commit }, x) {
       commit("setTokenMeta", x);
     },
-    setKabutoOnline({ commit }, x) {
-      commit("setKabutoOnline", x);
+    setApiLoadingStatus({ commit }, x) {
+      commit("setApiLoadingStatus", x);
+    },
+    setHederaNetworkStatus({ commit }, x) {
+      commit("setHederaNetworkStatus", x);
     }
   },
   modules: {}

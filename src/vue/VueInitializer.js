@@ -4,13 +4,15 @@ import { mapState, mapActions } from "vuex";
 import VTooltip from "v-tooltip";
 
 import VueRouter from "vue-router";
+import { isEqual } from "lodash";
 import App from "../popup/App.vue";
 import { RouteNames, Routing } from "./Routing";
 import store from "../store";
 import InternalMessage from "../messages/InternalMessage";
 import * as InternalMessageTypes from "../messages/InternalMessageTypes";
 import { NETWORKS } from "../models/Networks";
-import axios from "axios";
+import ApiService from "../services/ApiService";
+
 const { Client, AccountBalanceQuery } = require("@hashgraph/sdk");
 
 Vue.config.productionTip = false;
@@ -31,7 +33,7 @@ export default class VueInitializer {
       data() {
         return {
           RouteNames,
-          NETWORKS
+          NETWORKS,
         };
       },
       computed: {
@@ -41,7 +43,6 @@ export default class VueInitializer {
           "balance",
           "activeAccount",
           "tokenMeta",
-          "kabutoOnline"
         ]),
         hbarBalance() {
           if (!this.balance) return null;
@@ -56,24 +57,17 @@ export default class VueInitializer {
         tokenBalances() {
           if (!this.balance) return null;
 
-          if (Array.isArray(this.balance.tokens)) {
-            // Kabuto v2 retrieved tokens info
-            return this.balance.tokens;
-          } else {
-            // Fallback
-            const json = JSON.parse(this.balance.tokens.toString());
-            return Object.keys(json).map((tokenId) => {
-              // Merging in meta data with balances
-              const meta = this.tokenMeta.hasOwnProperty(tokenId)
-                ? this.tokenMeta[tokenId]
-                : { symbol: null, name: null, decimals: null, display: null };
-              return Object.assign({ tokenId, balance: json[tokenId] }, meta);
-            });
-          }
+          return Object.keys(this.balance.tokens).map(tokenId => {
+            // Merging in meta data with balances
+            const meta = this.tokenMeta.hasOwnProperty(tokenId)
+              ? { ...this.balance.tokens[tokenId].meta, ...this.tokenMeta[tokenId] }
+              : this.balance.tokens[tokenId].meta;
+            return Object.assign({ id: tokenId, balance: this.balance.tokens[tokenId].balance }, meta);
+          });
         },
         hasAccount() {
           return !!this.activeAccount;
-        }
+        },
       },
       mounted() {
         this.sanitizeVuex();
@@ -91,8 +85,14 @@ export default class VueInitializer {
           const meta = {
             name: query.name,
             symbol: query.symbol,
+            memo: query.memo,
             decimals: query.decimals,
-            display: query.display
+            type: query.type,
+            ipfs: query.ipfs,
+            display: query.display,
+            totalSupply: query.totalSupply,
+            metaDataLoaded: query.metaDataLoaded,
+            serialDataLoaded: query.serialDataLoaded,
           };
 
           // Soft save (prevents having to go back to IPC to update local refs
@@ -101,9 +101,9 @@ export default class VueInitializer {
           store.dispatch("setTokenMeta", clone);
           this.$forceUpdate();
           // Hard save
-          return InternalMessage.payload(InternalMessageTypes.SET_TOKEN_META, {
+          return await InternalMessage.payload(InternalMessageTypes.SET_TOKEN_META, {
             id,
-            meta
+            meta,
           }).send();
         },
         async checkActiveAccount() {
@@ -158,80 +158,140 @@ export default class VueInitializer {
 
           return client;
         },
+        async syncTokenBalanceStorage(balanceQueryTokens) {
+          // Get tokenBalance from storage
+          const storedTokenBalance = await InternalMessage.signal(InternalMessageTypes.GET_TOKEN_BALANCE).send();
+          // Create object from balance query response
+          const latestQueryTokens = JSON.parse(balanceQueryTokens.toString());
+          // Compare stored balance with balance from last query and update storage if needed
+          if (!isEqual(storedTokenBalance, latestQueryTokens)) {
+            // This will return true if something was stored
+            return await InternalMessage.payload(InternalMessageTypes.SET_TOKEN_BALANCE, JSON.parse(balanceQueryTokens.toString())).send();
+          }
+          return false;
+        },
+        async checkHederaNetworkStatus() {
+          const { status: { description }, components } = await ApiService.getHederaNetStatus(this.activeAccount.network);
+
+          if (description !== "All Systems Operational") {
+            const degradedComponents = components.filter(c => {
+              if (c.status !== "operational") return { name: c.name, status: c.status }
+            });
+
+            if (description && degradedComponents?.length) {
+              store.dispatch("setHederaNetworkStatus", { description, degradedComponents })
+            } else {
+              store.dispatch("setHederaNetworkStatus", null);
+            }
+          }
+        },
         async getAccountInfo() {
           if (!this.activeAccount) return;
 
+          // Check hedera network status
+          this.checkHederaNetworkStatus();
+
+          // Reset api messages when not reloading
+          if (this.apiErrors && this.apiLoadingStatus?.includes("Reloading"))
+            store.dispatch("setApiLoadingStatus", { status: null, error: null })
+
+          // Get account balance with sdk query
           const client = Client[`for${this.activeAccount.network}`]();
-          let accountBalance = await new AccountBalanceQuery()
+          const accountBalance = await new AccountBalanceQuery()
             .setAccountId(this.activeAccount.name)
             .execute(client)
             .catch((err) => {
               console.error("Error getting account balance", err);
+              // Display error
+              store.dispatch("setApiLoadingStatus", { status: null, error: "Error getting account balance." })
               return null;
             });
 
-          if (accountBalance) {
-            // Grab token info from kabuto v2
-            await axios
-              .get(
-                `https://v2.api.testnet.kabuto.sh/account/${this.activeAccount.name}/token`
-              )
-              .then(({ data: tokens }) => {
-                tokens = tokens.data;
+          // If queried account balance has tokens, compare with storage and get basic data from mirror
+          const storageUpdated = await this.syncTokenBalanceStorage(accountBalance.tokens);
 
-                // Query every token specifically to grab its totalSupply property to
-                // distinguish between pre-HIP-17 & post-HIP-17 created NFTs
-                for (const token of tokens) {
-                  // Tokens of type: null are ignored
-                  if (token.type) {
-                    axios
-                      .get(
-                        `https://v2.api.testnet.kabuto.sh/token/${token.tokenId}`
-                      )
-                      .then(({ data: moreTokenDetails }) => {
-                        // Mash together existing metadata properties in token w/ new metadata properties in moreTokenDetails
-                        Object.assign(token, moreTokenDetails.data);
-                      })
-                      .catch((err) => console.log(err));
-                  }
-                }
+          // If any token is missing data
+          const allDataLoaded = Object.keys(this.tokenMeta)?.length && Object.keys(this.tokenMeta).reduce((r, k) => {
+            const { metaDataLoaded, serialDataLoaded } = this.tokenMeta[k]
+            return metaDataLoaded && serialDataLoaded && r;
+          });
 
-                return tokens;
-              })
-              .catch(() => {
-                // If kabuto v2 is down, fallback to hedera SDK to retrieve token info
-                store.dispatch("setKabutoOnline", false);
-              })
-              .then((tokens) => {
-                // For every token that has an ipfs link in its symbol,
-                // query the ipfs for the metadata and set the image/video in token.display
-                for (const token of tokens) {
-                  if (token.symbol && token.symbol.includes("ipfs")) {
-                    axios
-                      .get(token.symbol)
-                      .then(
-                        ({ data }) =>
-                          (token.display = data.sku.nftPublicAssets[0])
-                      )
-                      .catch((err) => console.log(err));
-                  }
-                }
+          // If the balance query has length and the stored balance was updated with new data...
+          if (accountBalance?.tokens?.size > 0 && (storageUpdated || !allDataLoaded)) {
+            // Get extra balance data from mirrors
+            const balance = await ApiService.getAccountTokenBalanceData(
+              this.activeAccount.network,
+              this.activeAccount.name,
+              accountBalance
+            );
 
-                return tokens;
-              })
-              .then((tokens) => {
-                // Set new tokens in accountBalance
-                accountBalance = Object.assign({}, accountBalance, {
-                  tokens
-                });
+            if (balance.apiErrors) {
+              store.dispatch("setApiLoadingStatus", { status: null, error: "Error getting account balance data." })
+            } else {
+              store.dispatch("setApiLoadingStatus", { status: "Getting data for new tokens.", error: null })
+            }
 
-                // Set state that kabuto v2 was used to retrieve token info
-                store.dispatch("setKabutoOnline", true);
-              });
+            // Get token meta in storage
+            const tokenMeta = await InternalMessage.signal(
+              InternalMessageTypes.GET_TOKEN_META
+            ).send();
 
-            store.dispatch("setBalance", accountBalance);
+            // Look for new tokens and tokens without metadata
+            const newTokensIds = Object.keys(balance.tokensData).filter(k =>
+              !(k in tokenMeta) || !this.tokenMeta[k]?.metaDataLoaded || !this.tokenMeta[k]?.serialDataLoaded
+            );
+
+            // If there are new tokens, add basic metadata from mirror nodes
+            let counter = 0;
+            for (const id of newTokensIds) {
+              const { tokenData, apiErrors } = await ApiService.getTokenData(
+                this.activeAccount.network,
+                id
+              );
+
+              counter++;
+
+              const tokenLoaded = !apiErrors;
+              const serialLoaded = !balance?.apiErrors?.serialErrors?.includes(id);
+
+              if (apiErrors) {
+                store.dispatch("setApiLoadingStatus",
+                  { status: null, error: `Error loading metadata for ${tokenData?.name ? tokenData.name : id} (${counter} of ${newTokensIds.length})` })
+              } else {
+                store.dispatch("setApiLoadingStatus",
+                  { status: `Loaded metadata for ${tokenData?.name ? tokenData.name : id} (${counter} of ${newTokensIds.length})`, error: null })
+              }
+
+              if (!serialLoaded) {
+                store.dispatch("setApiLoadingStatus",
+                  { status: null, error: `Error loading serial data for ${tokenData?.name ? tokenData.name : id} (${counter} of ${newTokensIds.length})` })
+              }
+
+              await this.setTokenMeta(id, { ...balance.tokensData[id].meta, ...tokenData, metaDataLoaded: tokenLoaded, serialDataLoaded: serialLoaded });
+            };
+
+            // Update balance in vue store
+            store.dispatch("setBalance", { ...accountBalance, tokens: balance.tokensData });
             this.$forceUpdate();
+          } else if (accountBalance?.tokens?.size === 0) {
+            const tokens = JSON.parse(accountBalance.tokens.toString());
+            store.dispatch("setBalance", { ...accountBalance, tokens });
+          } else {
+            // else reconstruct vue store from storage using accountBalance as account index
+            const storedTokenMeta = await InternalMessage.signal(InternalMessageTypes.GET_TOKEN_META).send();
+            const storedMetaKeys = Object.keys(storedTokenMeta);
+
+            let tokens = {};
+
+            [...accountBalance.tokens].forEach(([id, balance]) => {
+              const tokenInstances = storedMetaKeys.filter((key) => key.includes(id.toString()));
+              tokenInstances.forEach((id) => tokens[id] = { balance: balance.toString(), meta: storedTokenMeta[id] })
+            });
+
+            store.dispatch("setBalance", { ...accountBalance, tokens });
           }
+
+          store.dispatch("setApiLoadingStatus", { status: null, error: null })
         },
         formatNumber(num) {
           if (!num) return 0;
@@ -245,8 +305,8 @@ export default class VueInitializer {
             .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
           if (!decimal || parseInt(decimal) === 0) return formatted;
           return `${formatted}.${decimal}`;
-        }
-      }
+        },
+      },
     });
 
     this.setupVue(router);

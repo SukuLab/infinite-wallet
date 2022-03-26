@@ -8,7 +8,6 @@ import Blank from "../views/Blank";
 import Transfer from "../views/Transfer";
 import AssociateToken from "../views/AssociateToken";
 import ViewTokens from "../views/ViewTokens";
-import ViewNFTs from "../views/ViewNFTs.vue";
 
 export const promptPrefix = "prompt-";
 
@@ -33,7 +32,7 @@ const RouteViews = {
   [RouteNames.Transfer]: Transfer,
   [RouteNames.AssociateToken]: AssociateToken,
   [RouteNames.ViewTokens]: ViewTokens,
-  [RouteNames.ViewNFTs]: ViewNFTs,
+  [RouteNames.ViewNFTs]: ViewTokens,
 
   [RouteNames.PromptLogin]: PromptLogin,
   [RouteNames.PromptSignature]: PromptSignature,

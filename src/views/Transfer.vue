@@ -15,7 +15,7 @@
           placeholder="Enter an account ID"
         />
 
-        <section style="width:100%;">
+        <section style="width: 100%">
           <section class="amount-display">
             <input v-model="amount" />
             <figure v-show="!amount || !amount.length" class="placeholder">
@@ -36,7 +36,7 @@
           </section>
         </section>
 
-        <section style="width:100%;">
+        <section style="width: 100%">
           <input
             placeholder="Add an optional memo"
             v-model="memo"
@@ -65,7 +65,10 @@
           </figure>
           <figure class="title">Success</figure>
           <figure class="text">
-            You sent <b>{{ amount }} HBAR</b> to <b>{{ recipient }}</b>
+            You sent
+            <b v-if="tokenSent">{{ tokenSent }}</b>
+            <b v-else>{{ amount }} {{tokenSent}} HBAR</b>
+            to <b>{{ recipient }}</b>
             <br />
             <br />
             <span style="font-size: 9px">{{ txid }}</span>
@@ -102,14 +105,16 @@ const {
   TransferTransaction,
   Hbar,
   HbarUnit,
-  TokenInfoQuery
+  TokenInfoQuery,
+  NftId,
+  TokenNftInfoQuery,
 } = require("@hashgraph/sdk");
 
 const STATUS = {
   DETAILS: 0,
   SENDING: 1,
   SENT: 2,
-  ERROR: 3
+  ERROR: 3,
 };
 
 let eraseTimeout;
@@ -129,6 +134,7 @@ export default {
 
       recipient: "",
       amount: "",
+      tokenSent: "",
       memo: "",
 
       eraseCount: null,
@@ -137,7 +143,7 @@ export default {
       txid: "",
       error: null,
 
-      tokenId: "HBAR"
+      tokenId: "HBAR",
     };
   },
   computed: {},
@@ -189,6 +195,42 @@ export default {
               this.recipient,
               Hbar.fromString(amount, HbarUnit.Hbar)
             );
+        } else if (this.tokenMeta[this.tokenId].type.includes("NON_FUNGIBLE")) {
+          const nftId = NftId.fromString(this.tokenId);
+
+          const meta = await new TokenInfoQuery()
+            .setTokenId(nftId.tokenId)
+            .execute(client)
+            .catch((err) => {
+              // TODO: Error handling
+              console.error("Fetch token meta query error", err);
+              return null;
+            });
+
+          if (!meta) return;
+
+          tx = new TransferTransaction()
+            .addNftTransfer(nftId, this.activeAccount.name, this.recipient)
+            .freezeWith(client);
+
+          if (this.memo.length) tx.setTransactionMemo(this.memo);
+
+          await tx.signWithOperator(client);
+
+          let response = await tx.execute(client);
+          if (response) this.txid = response.transactionId.toString();
+
+          let receipt = await response.getReceipt(client);
+          if (receipt) {
+            this.tokenSent = this.tokenId;
+            this.status = STATUS.SENT;
+            this.sent = true;
+            setTimeout(() => {
+              this.getAccountInfo();
+            }, 1000);
+          }
+
+          this.sent = true;
         } else {
           const meta = await new TokenInfoQuery()
             .setTokenId(this.tokenId)
@@ -210,48 +252,50 @@ export default {
               -correctedAmount
             )
             .addTokenTransfer(this.tokenId, this.recipient, correctedAmount);
-        }
 
-        if (this.memo.length) tx.setTransactionMemo(this.memo);
+          if (this.memo.length) tx.setTransactionMemo(this.memo);
 
-        await tx.signWithOperator(client);
+          await tx.signWithOperator(client);
 
-        const response = await tx.execute(client).catch((err) => {
-          console.error("Error sending", err);
-          this.status = STATUS.ERROR;
-          this.error = err;
-          return null;
-        });
+          const response = await tx.execute(client).catch((err) => {
+            console.error("Error sending", err);
+            this.status = STATUS.ERROR;
+            this.error = err;
+            return null;
+          });
 
-        if (response) {
-          // Time for animations!
-          await new Promise((r) => setTimeout(r, 2000));
+          if (response) {
+            // Time for animations!
+            await new Promise((r) => setTimeout(r, 2000));
 
-          this.status = STATUS.SENT;
-          this.txid = response.transactionId.toString();
-          if (
-            await response.getReceipt(client).catch((err) => {
-              console.error("Error sending", err);
-              this.status = STATUS.ERROR;
-              this.error = err;
-              return null;
-            })
-          ) {
-            this.status = STATUS.SENT;
+            this.status = STATUS.SENDING;
+            this.txid = response.transactionId.toString();
+            this.tokenSent = this.tokenId;
+
+            if (
+              await response.getReceipt(client).catch((err) => {
+                console.error("Error sending", err);
+                this.status = STATUS.ERROR;
+                this.error = err;
+                return null;
+              })
+            ) {
+              this.status = STATUS.SENT;
+              this.sent = true;
+              setTimeout(() => {
+                this.getAccountInfo();
+              }, 1000);
+            }
+
             this.sent = true;
-            setTimeout(() => {
-              this.getAccountInfo();
-            }, 1000);
           }
-
-          this.sent = true;
         }
       } catch (e) {
         console.error("Transfer error", e);
         this.error = e;
         this.status = STATUS.ERROR;
       }
-    }
+    },
   },
   watch: {
     amount() {
@@ -262,8 +306,8 @@ export default {
         .split("")
         .filter((x) => chars.includes(x))
         .join("");
-    }
-  }
+    },
+  },
 };
 </script>
 

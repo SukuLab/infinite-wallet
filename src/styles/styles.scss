@@ -51,7 +51,7 @@ body {
   box-sizing: border-box;
   position: relative;
   word-break: break-word;
-  background-color: $black;
+  background-color: $base;
 }
 
 * {
@@ -67,11 +67,11 @@ a {
 
 button {
   border-radius: 150px;
-  background: $black;
+  background: $grey-50;
   color: $white;
   font-weight: 300;
   outline: 0;
-  border: 1px solid $lightgrey;
+  border: thin solid $grey-100;
   width: 100%;
   font-size: 22px;
   height: 60px;
@@ -86,7 +86,7 @@ button {
 
   &:hover {
     background: $yellow;
-    border: 1px solid $lightgrey;
+    border: thin solid $yellow;
     color: $black;
   }
 

@@ -13,6 +13,8 @@ export const DESTROY = 'destroy';
 export const INTERNAL_SIGN = 'internalSign';
 export const SET_TOKEN_META = 'setTokenMeta';
 export const GET_TOKEN_META = 'getTokenMeta';
+export const SET_TOKEN_BALANCE = 'setTokenBalance';
+export const GET_TOKEN_BALANCE = 'getTokenBalance';
 export const SET_ACTIVE_ACCOUNT = 'setActiveAccount';
 export const GET_ACTIVE_ACCOUNT = 'getActiveAccount';
 

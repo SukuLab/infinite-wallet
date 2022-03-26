@@ -120,12 +120,19 @@
       </section>
     </section>
     <section class="nav-container">
-      <img
+      <svg 
+        width="43" 
+        height="72" 
+        viewBox="0 0 43 72" 
+        fill="none" 
+        xmlns="http://www.w3.org/2000/svg"
         v-if="!showGoBack"
         alt="logo"
-        src="../assets/logo.png"
         class="logo"
-      />
+      >
+        <path d="M42.6316 68.3886V5.49276L24.8719 26.6231L9.77589 0H4.30787L21.6309 30.7854L17.904 35.2862L0 3.36479V63.4395L17.1312 44.2391L33.0018 72H38.5191L20.469 40.1812L24.1959 35.432L42.6316 68.3886ZM38.2762 18.6063V50.3764L27.6306 31.4731L38.2762 18.6063ZM4.50857 50.9687V21.8234L14.332 39.3405L4.50857 50.9687Z" fill="white"/>
+      </svg>
+
       <figure v-else @click="$router.back()" class="go-back">
         <i class="fas fa-arrow-left"></i>
       </figure>
@@ -541,7 +548,6 @@ export default {
   .logo {
     opacity: 1;
     height: 2rem;
-    filter: invert(1);
   }
 }
 </style>
